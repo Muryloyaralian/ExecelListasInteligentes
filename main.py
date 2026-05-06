@@ -8,15 +8,20 @@ st.set_page_config(page_title="Limpador de Excel Pro", layout="wide")
 
 # --- FUNÇÕES DE UTILIDADE ---
 def limpar_numero(tel):
+    """Remove caracteres não numéricos e trata decimais do Excel (.0)."""
     if pd.isna(tel): return ""
-    return re.sub(r'\D', '', str(tel))
+    s_tel = str(tel).strip()
+    # Remove o ".0" que o Excel coloca em colunas numéricas
+    if s_tel.endswith('.0'):
+        s_tel = s_tel[:-2]
+    return re.sub(r'\D', '', s_tel)
 
 def normalizar_colunas(df):
     df.columns = [str(c).strip().lower() for c in df.columns]
     return df
 
 def to_csv(df):
-    return df.to_csv(index=False).encode('utf-8-sig') # utf-8-sig para abrir direto no Excel sem erro de acento
+    return df.to_csv(index=False).encode('utf-8-sig') 
 
 # --- INTERFACE PRINCIPAL ---
 st.title("✂️ Ferramenta de Tratamento e Unificação de Dados")
@@ -39,14 +44,27 @@ with tab1:
         unir_tels = st.sidebar.checkbox("Unir DDD + Números", key="tel_tab1")
 
         if unir_tels:
-            pares = [('ddd_cel1', 'cel1', 'celular_1_completo'), ('ddd_cel2', 'cel2', 'celular_2_completo'),
-                     ('ddd_cel3', 'cel3', 'celular_3_completo'), ('ddd_tel1', 'tel1', 'telefone_1_completo'),
-                     ('ddd_tel2', 'tel2', 'telefone_2_completo')]
+            pares = [
+                ('ddd_cel1', 'cel1', 'celular_1_completo'), 
+                ('ddd_cel2', 'cel2', 'celular_2_completo'),
+                ('ddd_cel3', 'cel3', 'celular_3_completo'), 
+                ('ddd_tel1', 'tel1', 'telefone_1_completo'),
+                ('ddd_tel2', 'tel2', 'telefone_2_completo')
+            ]
             col_remover = []
-            for ddd, num, nova in pares:
-                if ddd in df.columns and num in df.columns:
-                    df[nova] = df.apply(lambda x: limpar_numero(x[ddd]) + limpar_numero(x[num]), axis=1)
-                    col_remover.extend([ddd, num])
+            for ddd_col, num_col, nova in pares:
+                if ddd_col in df.columns and num_col in df.columns:
+                    def tratar_uniao(row):
+                        v_ddd = limpar_numero(row[ddd_col])
+                        v_num = limpar_numero(row[num_col])
+                        # Remove zero à esquerda do DDD se existir (ex: 048 -> 48)
+                        if v_ddd.startswith('0') and len(v_ddd) > 2:
+                            v_ddd = v_ddd[1:]
+                        return v_ddd + v_num if v_ddd or v_num else ""
+                    
+                    df[nova] = df.apply(tratar_uniao, axis=1)
+                    col_remover.extend([ddd_col, num_col])
+            
             df = df.drop(columns=[c for c in col_remover if c in df.columns])
 
         selecionadas = st.multiselect("Manter colunas:", df.columns.tolist(), default=df.columns.tolist())
@@ -73,16 +91,13 @@ with tab1:
             
             st.dataframe(df_final.head(10))
             
-            # BOTÕES DE DOWNLOAD LADO A LADO
             col_down1, col_down2 = st.columns(2)
             
-            # Excel
             output = BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_final.to_excel(writer, index=False)
             col_down1.download_button("🚀 Baixar em EXCEL", output.getvalue(), "planilha_ajustada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             
-            # CSV
             col_down2.download_button("📄 Baixar em CSV", to_csv(df_final), "planilha_ajustada.csv", "text/csv")
 
 # --- ABA 2: UNIFICADOR / COMPLEMENTAR DADOS ---
@@ -108,13 +123,11 @@ with tab2:
                 st.dataframe(df_resultado.head(15))
 
                 col_u1, col_u2 = st.columns(2)
-                # Excel
                 output_uni = BytesIO()
                 with pd.ExcelWriter(output_uni, engine='openpyxl') as writer:
                     df_resultado.to_excel(writer, index=False)
                 col_u1.download_button("🔗 Baixar EXCEL", output_uni.getvalue(), "unificado.xlsx")
                 
-                # CSV
                 col_u2.download_button("📄 Baixar CSV", to_csv(df_resultado), "unificado.csv", "text/csv")
         else:
             st.error("⚠️ Ambas precisam ter a coluna 'cnpj'!")
