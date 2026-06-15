@@ -3,15 +3,12 @@ import pandas as pd
 from io import BytesIO
 import re
 
-# 1. Configuração da Página
 st.set_page_config(page_title="Limpador de Excel Pro", layout="wide")
 
-# --- FUNÇÕES DE UTILIDADE ---
 def limpar_numero(tel):
     """Remove caracteres não numéricos e trata decimais do Excel (.0)."""
     if pd.isna(tel): return ""
     s_tel = str(tel).strip()
-    # Remove o ".0" que o Excel coloca em colunas numéricas
     if s_tel.endswith('.0'):
         s_tel = s_tel[:-2]
     return re.sub(r'\D', '', s_tel)
@@ -22,13 +19,10 @@ def normalizar_colunas(df):
 
 def to_csv(df):
     return df.to_csv(index=False).encode('utf-8-sig') 
-
-# --- INTERFACE PRINCIPAL ---
 st.title("✂️ Ferramenta de Tratamento e Unificação de Dados")
 
 tab1, tab2 = st.tabs(["🎯 1. Ajustador Inteligente", "🔗 2. Complementar Dados (VLOOKUP)"])
 
-# --- ABA 1: AJUSTADOR INTELIGENTE ---
 with tab1:
     st.header("Ajuste de Colunas e Formatação")
     arquivo_ajuste = st.file_uploader("Suba a planilha para formatar (.xlsx)", type=["xlsx"], key="ajuste_single")
